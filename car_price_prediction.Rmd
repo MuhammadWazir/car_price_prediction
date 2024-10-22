@@ -1,0 +1,148 @@
+---
+title: "car_price_prediction"
+output: pdf_document
+date: "2024-10-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load the data
+
+```{r}
+library(tidyverse)
+df=read.csv("Car details v3.csv")
+head(df)
+dim(df)
+```
+
+Remove units from mileage and max_power
+```{r}
+remove_units <- function(column) {
+  as.numeric(sub(" .*", "", column))
+}
+
+# Apply the function to mileage and max_power
+df$mileage <- remove_units(df$mileage)
+df$max_power <- remove_units(df$max_power)
+df$torque <- as.character(df$torque)
+df$torque <- ifelse(grepl("kgm", df$torque),
+                    as.numeric(sapply(strsplit(df$torque, "[^0-9.]+"), function(x) x[1])) * 9.80665,
+                    as.numeric(sapply(strsplit(df$torque, "[^0-9.]+"), function(x) x[1])))
+df$engine <- as.numeric(sub(" CC", "", df$engine))
+```
+
+Remove Records with missing values
+```{r}
+df = na.omit(df)
+dim(df)
+head(df)
+```
+Remove outliers using IQR method
+
+```{r}
+remove_outliers <- function(df, column) {
+  Q1 = quantile(df[[column]], 0.25)
+  Q3 = quantile(df[[column]], 0.75)
+  IQR = Q3 - Q1
+  
+
+  lower_bound = Q1 - 1.5 * IQR
+  upper_bound = Q3 + 1.5 * IQR
+  
+  df_filtered = df %>% filter(df[[column]] >= lower_bound & df[[column]] <= upper_bound)
+  
+  return(df_filtered)
+}
+
+# Apply the function to remove outliers from 'selling_price'
+df = remove_outliers(df, "selling_price")
+dim(df)
+```
+
+Boxplot for Fuel versus selling price
+```{r}
+library(ggplot2)
+# Assuming df is your dataframe and selling_price is in some large units
+library(ggplot2)
+
+# Convert selling_price to thousands
+df$selling_price_thousands <- df$selling_price / 1000
+
+ggplot(df, aes(x = fuel, y = selling_price_thousands, fill = fuel)) +
+  geom_boxplot() +
+  labs(y = "Selling Price (in thousands)") 
+```
+
+Boxplot for Fuel versus seller type
+```{r}
+ggplot(data = df, mapping=aes(x=seller_type, y= selling_price_thousands, fill = seller_type))+
+  geom_boxplot()+
+  labs(y = "Selling Price (in thousands)", x= "Seller Type") 
+```
+
+Boxplot for Fuel versus transmission type
+```{r}
+ggplot(data = df, mapping=aes(x=transmission, y= selling_price_thousands, fill = transmission))+
+  geom_boxplot()+
+  labs(y = "Selling Price (in thousands)") 
+```
+
+Boxplot for Fuel versus owner type
+```{r}
+ggplot(data = df, mapping=aes(x=owner, y= selling_price, fill = owner))+
+  geom_boxplot()+
+  labs(y = "Selling Price (in thousands)") 
+```
+Transform categorical features to numerical using dummy variables
+```{r}
+# Load the fastDummies package
+library(fastDummies)
+df_dummies <- dummy_cols(df, select_columns = c('fuel', 'seller_type', 'transmission', 'owner'), remove_first_dummy = TRUE)
+df_dummies <- df_dummies %>% select(-fuel, -seller_type, -transmission, -owner)
+head(df_dummies)
+```
+
+
+Correlation matrix
+
+```{r}
+df = df_dummies
+numerical_columns <- df %>% select(year, selling_price, km_driven, engine, mileage, max_power, seats)
+
+correlation_matrix <- cor(numerical_columns, use = "complete.obs")
+print(correlation_matrix)
+```
+Scatter plot for selling_price vs max_power
+
+```{r}
+
+ggplot(df, aes(x = max_power, y = selling_price)) +
+  geom_point(color = "blue") +
+  geom_smooth(color = "red")
+```
+
+Scatter plot for engine vs max_power
+```{r}
+ggplot(df, aes(x = engine, y = max_power)) +
+  geom_point(color = "blue") +
+  geom_smooth(color = "red") +
+  labs(title = "Engine Size vs Max Power", x = "Engine Size (CC)", y = "Max Power (bhp)")
+```
+
+# Scatter plot for year vs selling_price
+```{r}
+ggplot(df, aes(x = year, y = selling_price)) +
+  geom_point(color = "blue") +
+  geom_smooth(color = "red") +
+  labs(title = "Year vs Selling Price", x = "Year", y = "Selling Price")
+```
+
+Scatter plot for engine vs selling_price
+```{r}
+ggplot(df, aes(x = engine, y = selling_price)) +
+  geom_point(color = "blue") +
+  geom_smooth(color = "red") +
+  labs(title = "Engine Size vs Selling Price", x = "Engine Size (CC)", y = "Selling Price")
+```
